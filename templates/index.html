@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configure 2026 | Vehicle Health & Predictive Maintenance ({{ team_id }})</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --healthy: #10b981;
+      --degrading: #f59e0b;
+      --critical: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; }
+    header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+      padding: 16px 22px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; margin-bottom: 20px; gap: 12px;
+    }
+    .title-group h1 { font-size: 1.35rem; color: var(--accent); }
+    .title-group p { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+    .badge {
+      padding: 6px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+      background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
+    }
+    .kpi-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpi-card .value { font-size: 1.9rem; font-weight: 700; margin-top: 8px; }
+    .main-grid {
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px;
+    }
+    @media (max-width: 960px) { .main-grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
+    }
+    .panel h2 { font-size: 1.05rem; margin-bottom: 14px; color: #e5e7eb; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .vehicle-card {
+      border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px;
+      background: rgba(17, 24, 39, 0.6);
+    }
+    .vehicle-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .veh-id { font-weight: 700; font-size: 1rem; }
+    .status-pill { padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+    .HEALTHY { background: rgba(16, 185, 129, 0.15); color: var(--healthy); }
+    .DEGRADING { background: rgba(245, 158, 11, 0.15); color: var(--degrading); }
+    .CRITICAL { background: rgba(239, 68, 68, 0.2); color: var(--critical); }
+    .metrics-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.82rem;
+      background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 10px;
+    }
+    .metrics-row span { color: var(--muted); display: block; font-size: 0.72rem; }
+    .rec-box { font-size: 0.82rem; color: #cbd5e1; line-height: 1.4; }
+    .alert-item {
+      border-left: 4px solid var(--critical); background: rgba(239, 68, 68, 0.08);
+      padding: 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.84rem;
+    }
+    .alert-item.DEGRADING { border-left-color: var(--degrading); background: rgba(245, 158, 11, 0.08); }
+    .alert-meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1>Configure 2026 — Predictive Vehicle Health Twin</h1>
+      <p>Team ID: <strong>{{ team_id }}</strong> | Stream: <code>{{ input_topic }}</code> → <code>{{ alert_topic }}</code></p>
+    </div>
+    <div>
+      <span class="badge" id="stream-mode">Mode: CONNECTING...</span>
+    </div>
+  </header>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Active Fleet Units</div>
+      <div class="value" id="kpi-total">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Fleet Health Index</div>
+      <div class="value" id="kpi-avg" style="color: var(--healthy);">100%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Degrading / Warning</div>
+      <div class="value" id="kpi-degrading" style="color: var(--degrading);">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Critical Risk Alerts</div>
+      <div class="value" id="kpi-critical" style="color: var(--critical);">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Telemetry Packets</div>
+      <div class="value" id="kpi-packets" style="color: var(--accent);">0</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <h2>Live Vehicle Digital Twins & Remaining Useful Life (RUL)</h2>
+      <div id="vehicle-list"><p style="color: var(--muted);">Waiting for real-time telemetry packets...</p></div>
+    </div>
+
+    <div class="panel">
+      <h2>Predictive Maintenance Alerts & Diagnostics</h2>
+      <div id="alert-list"><p style="color: var(--muted);">No active anomalies detected yet.</p></div>
+    </div>
+  </div>
+
+  <script>
+    async function refreshState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+
+        document.getElementById('stream-mode').textContent = `Mode: ${data.metrics.mode}`;
+        document.getElementById('kpi-total').textContent = data.summary.total_vehicles;
+        document.getElementById('kpi-avg').textContent = `${data.summary.avg_health_score}%`;
+        document.getElementById('kpi-degrading').textContent = data.summary.degrading_vehicles;
+        document.getElementById('kpi-critical').textContent = data.summary.critical_vehicles;
+        document.getElementById('kpi-packets').textContent = data.metrics.messages_processed;
+
+        const vList = document.getElementById('vehicle-list');
+        if (data.vehicles.length > 0) {
+          vList.innerHTML = data.vehicles.map(v => `
+            <div class="vehicle-card">
+              <div class="vehicle-top">
+                <span class="veh-id">${v.vehicle_id} &nbsp;•&nbsp; Health: ${v.health_score}% &nbsp;•&nbsp; Est. RUL: ${v.predicted_rul_hours} hrs</span>
+                <span class="status-pill ${v.status}">${v.status}</span>
+              </div>
+              <div class="metrics-row">
+                <div><span>Engine Temp</span><strong>${v.telemetry.engine_temp} °C</strong></div>
+                <div><span>Oil Pressure</span><strong>${v.telemetry.oil_pressure} PSI</strong></div>
+                <div><span>Battery</span><strong>${v.telemetry.battery_voltage} V</strong></div>
+                <div><span>Vibration / RPM</span><strong>${v.telemetry.vibration}g / ${v.telemetry.rpm}</strong></div>
+              </div>
+              <div class="rec-box"><strong>Action:</strong> ${v.recommendations[0]}</div>
+            </div>
+          `).join('');
+        }
+
+        const aList = document.getElementById('alert-list');
+        if (data.recent_alerts.length > 0) {
+          aList.innerHTML = data.recent_alerts.map(a => `
+            <div class="alert-item ${a.severity}">
+              <div class="alert-meta">${a.vehicle_id} | Health: ${a.health_score}% | RUL: ${a.predicted_rul_hours} hrs | ${a.timestamp}</div>
+              <div><strong>${a.anomalies.map(x => x.subsystem + ': ' + x.message).join(' | ')}</strong></div>
+              <div style="margin-top:6px; color:#93c5fd;">→ ${a.recommendations.join(' ')}</div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setInterval(refreshState, 1500);
+    refreshState();
+  </script>
+</body>
+</html>
